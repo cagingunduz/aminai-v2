@@ -1,17 +1,17 @@
 import httpx
 import os
 
-ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1"
 
 
 async def generate_speech(text: str, voice_id: str) -> bytes:
-    """ElevenLabs ile metni sese çevir, MP3 bytes dön."""
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"{ELEVENLABS_API_URL}/text-to-speech/{voice_id}",
             headers={
-                "xi-api-key": ELEVENLABS_API_KEY,
+                "xi-api-key": api_key,
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
             json={
@@ -29,11 +29,14 @@ async def generate_speech(text: str, voice_id: str) -> bytes:
 
 
 async def get_voices() -> list:
-    """Mevcut sesleri listele."""
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"{ELEVENLABS_API_URL}/voices",
-            headers={"xi-api-key": ELEVENLABS_API_KEY},
+            headers={
+                "xi-api-key": api_key,
+                "Authorization": f"Bearer {api_key}"
+            },
             timeout=30
         )
         response.raise_for_status()
