@@ -1,5 +1,4 @@
 import replicate
-import httpx
 import os
 import uuid
 import boto3
@@ -38,8 +37,7 @@ def upload_audio_to_r2(audio_bytes: bytes) -> str:
 
 
 async def apply_lipsync(video_url: str, audio_bytes: bytes) -> str:
-    """Adım 4b: Sessiz video + ses → lip sync'li final video."""
-    # Sesi R2'ye yükle
+    """Apply lipsync using sync/lipsync-2 with active_speaker=True."""
     audio_url = upload_audio_to_r2(audio_bytes)
 
     client = replicate.Client(api_token=REPLICATE_API_TOKEN)
@@ -47,7 +45,9 @@ async def apply_lipsync(video_url: str, audio_bytes: bytes) -> str:
         "sync/lipsync-2",
         input={
             "video": video_url,
-            "audio": audio_url
+            "audio": audio_url,
+            "active_speaker": True,
+            "sync_mode": "remap"
         }
     )
     return _extract_url(output)
