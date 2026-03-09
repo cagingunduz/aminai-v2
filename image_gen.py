@@ -3,6 +3,7 @@ import httpx
 import uuid
 import io
 import boto3
+import asyncio
 import replicate
 from botocore.config import Config
 
@@ -60,7 +61,8 @@ async def generate_character_image(character_prompt: str, photo_url: str = None)
     if photo_url:
         input_params["image"] = photo_url
 
-    output = client.run("google/gemini-2.5-flash-image", input=input_params)
+    loop = asyncio.get_event_loop()
+    output = await loop.run_in_executor(None, lambda: client.run("google/gemini-2.5-flash-image", input=input_params))
     image_url = _extract_url(output)
 
     async with httpx.AsyncClient() as http:
@@ -102,7 +104,8 @@ async def generate_scene_image(
         extra_refs = ", ".join([f"character reference {i+2}: {url}" for i, url in enumerate(character_urls[1:])])
         input_params["prompt"] = f"{scene_prompt}. Additional character references: {extra_refs}"
 
-    output = client.run("google/gemini-2.5-flash-image", input=input_params)
+    loop = asyncio.get_event_loop()
+    output = await loop.run_in_executor(None, lambda: client.run("google/gemini-2.5-flash-image", input=input_params))
     image_url = _extract_url(output)
 
     async with httpx.AsyncClient() as http:
