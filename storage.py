@@ -23,7 +23,7 @@ def get_r2_client():
 
 
 async def upload_final_video(video_url: str) -> str:
-    """Video URL'den dosyayı indir, R2'ye yükle, public URL dön."""
+    """Download video from URL and upload to R2 under final/ folder."""
     async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.get(video_url)
         resp.raise_for_status()
@@ -31,10 +31,5 @@ async def upload_final_video(video_url: str) -> str:
 
     s3 = get_r2_client()
     key = f"final/{uuid.uuid4()}.mp4"
-    s3.put_object(
-        Bucket=R2_BUCKET,
-        Key=key,
-        Body=video_bytes,
-        ContentType="video/mp4"
-    )
+    s3.put_object(Bucket=R2_BUCKET, Key=key, Body=video_bytes, ContentType="video/mp4")
     return f"{R2_PUBLIC_BASE}/{key}"
