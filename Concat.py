@@ -12,7 +12,7 @@ R2_BUCKET = os.environ.get("R2_BUCKET", "animai-videos")
 R2_PUBLIC_BASE = "https://pub-410f3488491a42f5a631e8944960bd55.r2.dev"
 
 TMP_DIR = "/tmp/animai"
-
+ 
 
 def ensure_tmp():
     os.makedirs(TMP_DIR, exist_ok=True)
