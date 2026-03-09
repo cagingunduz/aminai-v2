@@ -1,3 +1,4 @@
+import asyncio
 import replicate
 import os
 import uuid
@@ -37,12 +38,12 @@ def upload_audio_to_r2(audio_bytes: bytes) -> str:
 
 
 async def apply_lipsync(video_url: str, audio_bytes: bytes) -> str:
-    """Sessiz video + ses → sync/lipsync-2 ile lip sync'li final video."""
+    """Apply lipsync using sync/lipsync-2 with active_speaker=True."""
     audio_url = upload_audio_to_r2(audio_bytes)
 
     client = replicate.Client(api_token=REPLICATE_API_TOKEN)
-
-    output = client.run(
+    loop = asyncio.get_event_loop()
+    output = await loop.run_in_executor(None, lambda: client.run(
         "sync/lipsync-2",
         input={
             "video": video_url,
@@ -50,5 +51,5 @@ async def apply_lipsync(video_url: str, audio_bytes: bytes) -> str:
             "active_speaker": True,
             "sync_mode": "remap"
         }
-    )
+    ))
     return _extract_url(output)
