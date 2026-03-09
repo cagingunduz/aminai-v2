@@ -1,3 +1,4 @@
+import asyncio
 import replicate
 import os
 
@@ -30,7 +31,8 @@ async def animate_scene(
     """Generate silent animation from scene image."""
     client = replicate.Client(api_token=REPLICATE_API_TOKEN)
 
-    output = client.run(
+    loop = asyncio.get_event_loop()
+    output = await loop.run_in_executor(None, lambda: client.run(
         "bytedance/seedance-1-lite",
         input={
             "image": scene_image_url,
@@ -39,5 +41,5 @@ async def animate_scene(
             "resolution": "1080p",
             "aspect_ratio": "16:9"
         }
-    )
+    ))
     return _extract_url(output)
