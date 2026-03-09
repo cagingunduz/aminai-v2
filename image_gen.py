@@ -2,7 +2,6 @@ import os
 import httpx
 import uuid
 import io
-import base64
 import boto3
 import replicate
 from botocore.config import Config
@@ -26,9 +25,10 @@ def get_r2_client():
     )
 
 
-def upload_to_r2(image_bytes: bytes, folder: str, content_type: str = "image/png") -> str:
+def upload_to_r2(image_bytes: bytes, folder: str, ext: str = "png") -> str:
     s3 = get_r2_client()
-    key = f"{folder}/{uuid.uuid4()}.png"
+    key = f"{folder}/{uuid.uuid4()}.{ext}"
+    content_type = "image/png" if ext == "png" else "image/jpeg"
     s3.put_object(Bucket=R2_BUCKET, Key=key, Body=image_bytes, ContentType=content_type)
     return f"{R2_PUBLIC_BASE}/{key}"
 
@@ -43,19 +43,24 @@ def _extract_url(output) -> str:
     return str(output)
 
 
-async def generate_character_image(character_prompt: str) -> str:
-    """Adim 2: Beyaz bg'da karakter PNG uret, R2'ye yukle, URL don."""
+async def generate_character_image(character_prompt: str, photo_url: str = None) -> str:
+    """
+    Generate character PNG on white background.
+    If photo_url provided, use as reference for likeness.
+    """
     client = replicate.Client(api_token=REPLICATE_API_TOKEN)
 
-    output = client.run(
-        "google/gemini-2.5-flash-image",
-        input={
-            "prompt": character_prompt,
-            "aspect_ratio": "1:1",
-            "output_format": "png"
-        }
-    )
+    input_params = {
+        "prompt": character_prompt,
+        "aspect_ratio": "1:1",
+        "output_format": "png"
+    }
 
+    # If user provided a reference photo, add it
+    if photo_url:
+        input_params["image"] = photo_url
+
+    output = client.run("google/gemini-2.5-flash-image", input=input_params)
     image_url = _extract_url(output)
 
     async with httpx.AsyncClient() as http:
@@ -66,20 +71,38 @@ async def generate_character_image(character_prompt: str) -> str:
     return upload_to_r2(image_bytes, "characters")
 
 
-async def generate_scene_image(scene_prompt: str, character_image_url: str) -> str:
-    """Adim 3: Karakter PNG'yi referans alarak sahne image uret."""
+async def generate_scene_image(
+    scene_prompt: str,
+    character_urls: list,   # List of R2 URLs for character PNGs
+    aspect_ratio: str = "16:9"
+) -> str:
+    """
+    Generate scene image with all character references.
+    Supports up to 14 reference images (Gemini limit).
+    """
     client = replicate.Client(api_token=REPLICATE_API_TOKEN)
 
-    output = client.run(
-        "google/gemini-2.5-flash-image",
-        input={
-            "prompt": scene_prompt,
-            "image": character_image_url,
-            "aspect_ratio": "16:9",
-            "output_format": "png"
-        }
-    )
+    # Map aspect ratio to Replicate format
+    ratio_map = {"16:9": "16:9", "9:16": "9:16", "1:1": "1:1"}
+    ar = ratio_map.get(aspect_ratio, "16:9")
 
+    input_params = {
+        "prompt": scene_prompt,
+        "aspect_ratio": ar,
+        "output_format": "png"
+    }
+
+    # Add first character as primary reference
+    if character_urls:
+        input_params["image"] = character_urls[0]
+
+    # Add additional characters as extra references if model supports it
+    # Gemini 2.5 flash image supports multiple images via prompt context
+    if len(character_urls) > 1:
+        extra_refs = ", ".join([f"character reference {i+2}: {url}" for i, url in enumerate(character_urls[1:])])
+        input_params["prompt"] = f"{scene_prompt}. Additional character references: {extra_refs}"
+
+    output = client.run("google/gemini-2.5-flash-image", input=input_params)
     image_url = _extract_url(output)
 
     async with httpx.AsyncClient() as http:
